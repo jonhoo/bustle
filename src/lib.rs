@@ -182,6 +182,7 @@ impl Workload {
     }
 
     /// Execute this workload against the collection type given by `T`.
+    #[allow(clippy::cognitive_complexity)]
     pub fn run<T: BenchmarkTarget>(&self) {
         assert_eq!(
             self.mix.read + self.mix.insert + self.mix.remove + self.mix.update + self.mix.upsert,
@@ -257,8 +258,8 @@ impl Workload {
         let mut prefillers = Vec::new();
         for (mut table, keys) in tables.into_iter().zip(keys) {
             prefillers.push(std::thread::spawn(move || {
-                for i in 0..prefill_per_thread {
-                    let inserted = table.insert(&keys[i]);
+                for key in &keys[0..prefill_per_thread] {
+                    let inserted = table.insert(key);
                     assert!(inserted);
                 }
                 (table, keys)
