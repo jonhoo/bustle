@@ -1,5 +1,7 @@
 jobs:
  - template: default.yml@templates
+   parameters:
+     minrust: 1.39.0 # tracing-core
  - job: canary
    displayName: "Warning screening"
    pool:
