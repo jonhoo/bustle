@@ -1,6 +1,6 @@
 [package]
 name = "bustle"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -18,7 +18,7 @@ maintenance = { status = "experimental" }
 
 [dependencies]
 rand = { version = "0.7", features = ["small_rng"] }
-tracing = "0.1"
+tracing = { version = "0.1", features = ["std"], default-features = false }
 
 [dev-dependencies]
 tracing-subscriber = "0.2"
