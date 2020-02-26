@@ -5,17 +5,27 @@ use std::sync::RwLock;
 #[derive(Clone)]
 struct Table<K>(std::sync::Arc<RwLock<HashMap<K, ()>>>);
 
-impl<K> BenchmarkTarget for Table<K>
+impl<K> Collection for Table<K>
 where
     K: Send + Sync + From<u64> + Copy + 'static + std::hash::Hash + Eq + std::fmt::Debug,
 {
-    type Key = K;
-
+    type Handle = Self;
     fn with_capacity(capacity: usize) -> Self {
         Self(std::sync::Arc::new(RwLock::new(HashMap::with_capacity(
             capacity,
         ))))
     }
+
+    fn pin(&self) -> Self::Handle {
+        self.clone()
+    }
+}
+
+impl<K> CollectionHandle for Table<K>
+where
+    K: Send + Sync + From<u64> + Copy + 'static + std::hash::Hash + Eq + std::fmt::Debug,
+{
+    type Key = K;
 
     fn get(&mut self, key: &Self::Key) -> bool {
         self.0.read().unwrap().get(key).is_some()

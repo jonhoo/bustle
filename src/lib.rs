@@ -10,10 +10,10 @@
 //! probably want to measure your collection against many different workloads, rather than just a
 //! single one.
 //!
-//! To run the benchmark, just implement [`BenchmarkTarget`] for your collection, build a
-//! [`Workload`], and call [`Workload::run`] parameterized by your collection type. You may want to
-//! look at the benchmarks for lock-protected collections from the standard library in `benches/`
-//! for inspiration.
+//! To run the benchmark, just implement [`Collection`] for your collection (`CollectionHandle` may
+//! end up just being a call to `clone`), build a [`Workload`], and call [`Workload::run`]
+//! parameterized by your collection type. You may want to look at the benchmarks for
+//! lock-protected collections from the standard library in `benches/` for inspiration.
 //!
 //! The crate is, at the time of writing, a pretty direct port of the [Universal Benchmark] from
 //! `libcuckoo`, though that may change over time.
@@ -28,6 +28,7 @@
 )]
 
 use rand::prelude::*;
+use std::sync::Arc;
 use tracing::{debug, info, info_span};
 
 /// A workload mix configration.
@@ -131,19 +132,29 @@ pub struct Workload {
 
 /// A collection that can be benchmarked by bustle.
 ///
-/// Note that for all these methods, the benchmarker does not dictate what the values are. Feel
-/// free to use the same value for all operations, or use distinct ones and check that your
-/// retrievals indeed return the right results.
-pub trait BenchmarkTarget: Clone + Send + 'static {
-    /// The `u64` seeds used to construct `Key` (through `From<u64>`) are distinct.
-    /// The returned keys must be as well.
-    ///
-    /// The keys are required to be `Eq + Hash` so that the check for distinctness is relatively
-    /// efficient.
-    type Key: Send + From<u64> + std::fmt::Debug + Eq + std::hash::Hash;
+/// Any thread that performs operations on the collection will first call `pin` and then perform
+/// collection operations on the `Handle` that is returned. `pin` will not be called in the hot
+/// loop of the benchmark.
+pub trait Collection: Send + Sync + 'static {
+    /// A thread-local handle to the concurrent collection under test.
+    type Handle: CollectionHandle;
 
     /// Allocate a new instance of the benchmark target with the given capacity.
     fn with_capacity(capacity: usize) -> Self;
+
+    /// Pin a thread-local handle to the concurrent collection under test.
+    fn pin(&self) -> Self::Handle;
+}
+
+/// A handle to a key-value collection.
+///
+/// Note that for all these methods, the benchmarker does not dictate what the values are. Feel
+/// free to use the same value for all operations, or use distinct ones and check that your
+/// retrievals indeed return the right results.
+pub trait CollectionHandle {
+    /// The `u64` seeds used to construct `Key` (through `From<u64>`) are distinct.
+    /// The returned keys must be as well.
+    type Key: From<u64>;
 
     /// Perform a lookup for `key`.
     ///
@@ -182,8 +193,20 @@ impl Workload {
     }
 
     /// Execute this workload against the collection type given by `T`.
+    ///
+    /// The key type must be `Send` since we generate the keys on a different thread than the one
+    /// we do the benchmarks on.
+    ///
+    /// The key type must be `Debug` so that we can print meaningful errors if an assertion is
+    /// violated during the benchmark.
+    ///
+    /// The key type must be `Eq + Hash` so that the check for distinctness is relatively
+    /// efficient.
     #[allow(clippy::cognitive_complexity)]
-    pub fn run<T: BenchmarkTarget>(&self) {
+    pub fn run<T: Collection>(&self)
+    where
+        <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug + Eq + std::hash::Hash,
+    {
         assert_eq!(
             self.mix.read + self.mix.insert + self.mix.remove + self.mix.update + self.mix.upsert,
             100,
@@ -228,7 +251,8 @@ impl Workload {
             rng.fill_bytes(&mut thread_seed[..]);
             generators.push(std::thread::spawn(move || {
                 let mut rng: rand::rngs::SmallRng = rand::SeedableRng::from_seed(thread_seed);
-                let mut keys: Vec<T::Key> = Vec::with_capacity(insert_keys_per_thread);
+                let mut keys: Vec<<T::Handle as CollectionHandle>::Key> =
+                    Vec::with_capacity(insert_keys_per_thread);
                 keys.extend((0..insert_keys_per_thread).map(|_| rng.next_u64().into()));
                 keys
             }));
@@ -250,22 +274,23 @@ impl Workload {
         }
 
         info!("constructing initial table");
-        let table = T::with_capacity(initial_capacity);
-        let tables: Vec<_> = std::iter::repeat(table).take(self.threads).collect();
+        let table = Arc::new(T::with_capacity(initial_capacity));
 
         // And fill it
         let prefill_per_thread = prefill / self.threads;
         let mut prefillers = Vec::new();
-        for (mut table, keys) in tables.into_iter().zip(keys) {
+        for keys in keys {
+            let table = Arc::clone(&table);
             prefillers.push(std::thread::spawn(move || {
+                let mut table = table.pin();
                 for key in &keys[0..prefill_per_thread] {
                     let inserted = table.insert(key);
                     assert!(inserted);
                 }
-                (table, keys)
+                keys
             }));
         }
-        let thread_state: Vec<_> = prefillers
+        let keys: Vec<_> = prefillers
             .into_iter()
             .map(|jh| jh.join().unwrap())
             .collect();
@@ -275,8 +300,10 @@ impl Workload {
         let op_mix: &'static [_] = Box::leak(op_mix.into_boxed_slice());
         let start = std::time::Instant::now();
         let mut mix_threads = Vec::with_capacity(self.threads);
-        for (mut table, keys) in thread_state {
+        for keys in keys {
+            let table = Arc::clone(&table);
             mix_threads.push(std::thread::spawn(move || {
+                let mut table = table.pin();
                 mix(
                     &mut table,
                     &keys,
@@ -310,13 +337,15 @@ enum Operation {
     Upsert,
 }
 
-fn mix<T: BenchmarkTarget>(
-    tbl: &mut T,
-    keys: &[T::Key],
+fn mix<H: CollectionHandle>(
+    tbl: &mut H,
+    keys: &[H::Key],
     op_mix: &'static [Operation],
     ops: usize,
     prefilled: usize,
-) {
+) where
+    H::Key: Send + std::fmt::Debug + Eq + std::hash::Hash,
+{
     // Invariant: erase_seq <= insert_seq
     // Invariant: insert_seq < numkeys
     let nkeys = keys.len();
