@@ -234,14 +234,11 @@ impl Workload {
     /// The key type must be `Debug` so that we can print meaningful errors if an assertion is
     /// violated during the benchmark.
     ///
-    /// The key type must be `Eq + Hash` so that the check for distinctness is relatively
-    /// efficient.
-    ///
     /// Returns the seed used for the run.
     #[allow(clippy::cognitive_complexity)]
     pub fn run<T: Collection>(&self) -> [u8; 16]
     where
-        <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug + Eq + std::hash::Hash,
+        <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug,
     {
         assert_eq!(
             self.mix.read + self.mix.insert + self.mix.remove + self.mix.update + self.mix.upsert,
@@ -296,17 +293,6 @@ impl Workload {
             .into_iter()
             .map(|jh| jh.join().unwrap())
             .collect();
-
-        // Check that the seeds are indeed distinct.
-        // This _should_ be the case, but we double-check in case of broken From<u64> impls.
-        // Otherwise, the user will just see really weird errors in the benchmarking phase.
-        {
-            debug!("checking that key space is distinct");
-            let mut distinct = std::collections::HashSet::with_capacity(keys.len());
-            for key in &keys {
-                assert!(distinct.insert(key));
-            }
-        }
 
         info!("constructing initial table");
         let table = Arc::new(T::with_capacity(initial_capacity));
@@ -384,7 +370,7 @@ fn mix<H: CollectionHandle>(
     ops: usize,
     prefilled: usize,
 ) where
-    H::Key: Send + std::fmt::Debug + Eq + std::hash::Hash,
+    H::Key: std::fmt::Debug,
 {
     // Invariant: erase_seq <= insert_seq
     // Invariant: insert_seq < numkeys
