@@ -1,19 +1,20 @@
 use bustle::*;
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 #[derive(Clone)]
-struct Std<K>(Arc<Mutex<HashMap<K, ()>>>);
+struct Table<K>(std::sync::Arc<Mutex<HashMap<K, ()>>>);
 
-impl<K> BenchmarkTarget for Std<K>
+impl<K> BenchmarkTarget for Table<K>
 where
-    K: Send + From<u64> + Copy + 'static + Hash + Eq + std::fmt::Debug,
+    K: Send + From<u64> + Copy + 'static + std::hash::Hash + Eq + std::fmt::Debug,
 {
     type Key = K;
 
     fn with_capacity(capacity: usize) -> Self {
-        Self(Arc::new(Mutex::new(HashMap::with_capacity(capacity))))
+        Self(std::sync::Arc::new(Mutex::new(HashMap::with_capacity(
+            capacity,
+        ))))
     }
 
     fn get(&mut self, key: &Self::Key) -> bool {
@@ -42,5 +43,5 @@ where
 
 fn main() {
     tracing_subscriber::fmt::init();
-    Workload::new(1, Mix::read_heavy()).run::<Std<u64>>();
+    Workload::new(1, Mix::read_heavy()).run::<Table<u64>>();
 }
