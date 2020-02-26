@@ -1,6 +1,6 @@
 [package]
 name = "bustle"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -22,6 +22,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 tracing-subscriber = "0.2"
+num_cpus = "1"
 
 [[bench]]
 name = "arc_mutex_std"

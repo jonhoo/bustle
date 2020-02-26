@@ -102,22 +102,12 @@ pub struct Workload {
     mix: Mix,
 
     /// The initial capacity of the table, specified as a power of 2.
-    ///
-    /// Defaults to 21 (so `2^21 ~= 2M`).
-    initial_cap_e: u8,
+    initial_cap_log2: u8,
 
-    /// The percentage of the initial table capacity should we fill the table to before running the
-    /// benchmark.
-    ///
-    /// Defaults to 0%.
+    /// The fraction of the initial table capacity should we populate before running the benchmark.
     prefill_f: f64,
 
-    /// Total number of operations we are running, specified as a percentage of the initial
-    /// capacity.
-    ///
-    /// This value can exceed 100.
-    ///
-    /// Defaults to 75%.
+    /// Total number of operations as a multiple of the initial capacity.
     ops_f: f64,
 
     /// Number of threads to run the benchmark with.
@@ -184,12 +174,56 @@ impl Workload {
     pub fn new(threads: usize, mix: Mix) -> Self {
         Self {
             mix,
-            initial_cap_e: 21,
+            initial_cap_log2: 25,
             prefill_f: 0.0,
-            ops_f: 75.0,
+            ops_f: 0.75,
             threads,
             seed: None,
         }
+    }
+
+    /// Set the initial capacity for the map.
+    ///
+    /// Note that the capacity will be `2^` the given capacity!
+    ///
+    /// The number of operations and the number of pre-filled keys are determined based on the
+    /// computed initial capacity, so keep that in mind if you change this parameter.
+    ///
+    /// Defaults to 25 (so `2^25 ~= 34M`).
+    pub fn initial_capacity_log2(&mut self, capacity: u8) -> &mut Self {
+        self.initial_cap_log2 = capacity;
+        self
+    }
+
+    /// Set the fraction of the initial table capacity we should populate before running the
+    /// benchmark.
+    ///
+    /// Defaults to 0%.
+    pub fn prefill_fraction(&mut self, fraction: f64) -> &mut Self {
+        assert!(fraction >= 0.0);
+        assert!(fraction <= 1.0);
+        self.prefill_f = fraction;
+        self
+    }
+
+    /// Set the number of operations to run as a multiple of the initial capacity.
+    ///
+    /// This value can exceed 1.0.
+    ///
+    /// Defaults to 0.75 (75%).
+    pub fn operations(&mut self, multiple: f64) -> &mut Self {
+        assert!(multiple >= 0.0);
+        self.ops_f = multiple;
+        self
+    }
+
+    /// Set the seed used to randomize the workload.
+    ///
+    /// The seed does _not_ dictate thread interleaving, so you will only observe the exact same
+    /// workload if you run the benchmark with `nthreads == 1`.
+    pub fn seed(&mut self, seed: [u8; 16]) -> &mut Self {
+        self.seed = Some(seed);
+        self
     }
 
     /// Execute this workload against the collection type given by `T`.
@@ -202,8 +236,10 @@ impl Workload {
     ///
     /// The key type must be `Eq + Hash` so that the check for distinctness is relatively
     /// efficient.
+    ///
+    /// Returns the seed used for the run.
     #[allow(clippy::cognitive_complexity)]
-    pub fn run<T: Collection>(&self)
+    pub fn run<T: Collection>(&self) -> [u8; 16]
     where
         <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug + Eq + std::hash::Hash,
     {
@@ -212,9 +248,8 @@ impl Workload {
             100,
             "mix fractions do not add up to 100%"
         );
-        assert!(self.prefill_f <= 100.0);
 
-        let initial_capacity = 1 << self.initial_cap_e;
+        let initial_capacity = 1 << self.initial_cap_log2;
         let total_ops = (initial_capacity as f64 * self.ops_f) as usize;
 
         let seed = self.seed.unwrap_or_else(rand::random);
@@ -319,12 +354,17 @@ impl Workload {
             .collect();
         let took = start.elapsed();
 
-        info!(?took, ops = total_ops, "workload mix finished");
+        let avg = took / total_ops as u32;
+        info!(?took, ops = total_ops, ?avg, "workload mix finished");
 
         // TODO: do more with this information
         // TODO: collect statistics per operation type
-        eprintln!("{} operations in {:?}", total_ops, took);
-        eprintln!("avg: {:?}", took / total_ops as u32);
+        eprintln!(
+            "{} operations across {} thread(s) in {:?}; time/op = {:?}",
+            total_ops, self.threads, took, avg
+        );
+
+        seed
     }
 }
 
