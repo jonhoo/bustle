@@ -153,7 +153,7 @@ pub trait CollectionHandle {
 
     /// Insert `key` into the collection.
     ///
-    /// Should return `true` if a value was replaced by the operation.
+    /// Should return `true` if no value previously existed for the key.
     fn insert(&mut self, key: &Self::Key) -> bool;
 
     /// Remove `key` from the collection.
@@ -414,9 +414,9 @@ fn mix<H: CollectionHandle>(
                 find_seq = (a * find_seq + c) & find_seq_mask;
             }
             Operation::Insert => {
-                let replaced = tbl.insert(&keys[insert_seq]);
+                let new_key = tbl.insert(&keys[insert_seq]);
                 assert!(
-                    !replaced,
+                    new_key,
                     "insert({:?}) should insert a new value",
                     &keys[insert_seq]
                 );
@@ -461,7 +461,7 @@ fn mix<H: CollectionHandle>(
                 // Twist the LCG since we used find_seq
                 find_seq = (a * find_seq + c) & find_seq_mask;
 
-                let _inserted = !tbl.insert(&keys[n]);
+                let _inserted = tbl.insert(&keys[n]);
                 if n == insert_seq {
                     insert_seq += 1;
                 }

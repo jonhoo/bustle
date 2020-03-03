@@ -32,7 +32,7 @@ where
     }
 
     fn insert(&mut self, key: &Self::Key) -> bool {
-        self.0.lock().unwrap().insert(*key, ()).is_some()
+        self.0.lock().unwrap().insert(*key, ()).is_none()
     }
 
     fn remove(&mut self, key: &Self::Key) -> bool {
