@@ -319,17 +319,18 @@ impl Workload {
 
         info!("start workload mix");
         let ops_per_thread = total_ops / self.threads;
-        let op_mix: &'static [_] = Box::leak(op_mix.into_boxed_slice());
+        let op_mix = Arc::new(op_mix.into_boxed_slice());
         let start = std::time::Instant::now();
         let mut mix_threads = Vec::with_capacity(self.threads);
         for keys in keys {
             let table = Arc::clone(&table);
+            let op_mix = Arc::clone(&op_mix);
             mix_threads.push(std::thread::spawn(move || {
                 let mut table = table.pin();
                 mix(
                     &mut table,
                     &keys,
-                    op_mix,
+                    &op_mix,
                     ops_per_thread,
                     prefill_per_thread,
                 )
@@ -367,7 +368,7 @@ enum Operation {
 fn mix<H: CollectionHandle>(
     tbl: &mut H,
     keys: &[H::Key],
-    op_mix: &'static [Operation],
+    op_mix: &[Operation],
     ops: usize,
     prefilled: usize,
 ) where
