@@ -276,7 +276,8 @@ impl Workload {
         let insert_keys = std::cmp::max(initial_capacity, max_insert_ops) + prefill;
         // Round this quantity up to a power of 2, so that we can use an LCG to cycle over the
         // array "randomly".
-        let insert_keys_per_thread = insert_keys.next_power_of_two();
+        let insert_keys_per_thread =
+            ((insert_keys + self.threads - 1) / self.threads).next_power_of_two();
         let mut generators = Vec::new();
         for _ in 0..self.threads {
             let mut thread_seed = [0u8; 16];
