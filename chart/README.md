@@ -17,3 +17,5 @@ which perhaps isn't clearing garbage between runs.
 
 ![Uniform Performance](avg_performance_uniform.png)
 
+
+To generate the charts, use `python3 run.py`.
