@@ -12,6 +12,104 @@ use sharded::Map;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
+struct ArcRwLockStdTable<K>(std::sync::Arc<RwLock<HashMap<K, (), FxBuildHasher>>>);
+
+impl<K> Collection for ArcRwLockStdTable<K>
+where
+    K: Send + Sync + From<u64> + Copy + 'static + std::hash::Hash + Eq + std::fmt::Debug,
+{
+    type Handle = Self;
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::sync::Arc::new(RwLock::new(HashMap::with_capacity(
+            capacity,
+        ))))
+    }
+
+    fn pin(&self) -> Self::Handle {
+        self.clone()
+    }
+}
+
+impl<K> CollectionHandle for ArcRwLockStdTable<K>
+where
+    K: Send + Sync + From<u64> + Copy + 'static + std::hash::Hash + Eq + std::fmt::Debug,
+{
+    type Key = K;
+
+    fn get(&mut self, key: &Self::Key) -> bool {
+        self.0.read().unwrap().get(key).is_some()
+    }
+
+    fn insert(&mut self, key: &Self::Key) -> bool {
+        self.0.write().unwrap().insert(*key, ()).is_none()
+    }
+
+    fn remove(&mut self, key: &Self::Key) -> bool {
+        self.0.write().unwrap().remove(key).is_some()
+    }
+
+    fn update(&mut self, key: &Self::Key) -> bool {
+        use std::collections::hash_map::Entry;
+        let mut map = self.0.write().unwrap();
+        if let Entry::Occupied(mut e) = map.entry(*key) {
+            e.insert(());
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone)]
+struct ArcMutexStdTable<K>(std::sync::Arc<Mutex<HashMap<K, (), FxBuildHasher>>>);
+
+impl<K> Collection for ArcMutexStdTable<K>
+where
+    K: Send + From<u64> + Copy + 'static + std::hash::Hash + Eq,
+{
+    type Handle = Self;
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::sync::Arc::new(Mutex::new(HashMap::with_capacity(
+            capacity,
+        ))))
+    }
+
+    fn pin(&self) -> Self::Handle {
+        self.clone()
+    }
+}
+
+impl<K> CollectionHandle for ArcMutexStdTable<K>
+where
+    K: Send + From<u64> + Copy + 'static + std::hash::Hash + Eq,
+{
+    type Key = K;
+
+    fn get(&mut self, key: &Self::Key) -> bool {
+        self.0.lock().unwrap().get(key).is_some()
+    }
+
+    fn insert(&mut self, key: &Self::Key) -> bool {
+        self.0.lock().unwrap().insert(*key, ()).is_none()
+    }
+
+    fn remove(&mut self, key: &Self::Key) -> bool {
+        self.0.lock().unwrap().remove(key).is_some()
+    }
+
+    fn update(&mut self, key: &Self::Key) -> bool {
+        use std::collections::hash_map::Entry;
+        let mut map = self.0.lock().unwrap();
+        if let Entry::Occupied(mut e) = map.entry(*key) {
+            e.insert(());
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ShardTable<K>(Arc<Map<K, u32>>);
 
 impl<K> Collection for ShardTable<K>
