@@ -9,10 +9,11 @@ use contrie::ConMap;
 use dashmap::DashMap;
 use fxhash::FxBuildHasher;
 use sharded::Map;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
 #[derive(Clone)]
-struct ArcRwLockStdTable<K>(std::sync::Arc<RwLock<HashMap<K, (), FxBuildHasher>>>);
+struct ArcRwLockStdTable<K>(Arc<RwLock<HashMap<K, (), FxBuildHasher>>>);
 
 impl<K> Collection for ArcRwLockStdTable<K>
 where
@@ -20,8 +21,9 @@ where
 {
     type Handle = Self;
     fn with_capacity(capacity: usize) -> Self {
-        Self(std::sync::Arc::new(RwLock::new(HashMap::with_capacity(
+        Self(Arc::new(RwLock::new(HashMap::with_capacity_and_hasher(
             capacity,
+            FxBuildHasher::default(),
         ))))
     }
 
@@ -61,7 +63,7 @@ where
 }
 
 #[derive(Clone)]
-struct ArcMutexStdTable<K>(std::sync::Arc<Mutex<HashMap<K, (), FxBuildHasher>>>);
+struct ArcMutexStdTable<K>(Arc<Mutex<HashMap<K, (), FxBuildHasher>>>);
 
 impl<K> Collection for ArcMutexStdTable<K>
 where
@@ -69,8 +71,9 @@ where
 {
     type Handle = Self;
     fn with_capacity(capacity: usize) -> Self {
-        Self(std::sync::Arc::new(Mutex::new(HashMap::with_capacity(
+        Self(Arc::new(Mutex::new(HashMap::with_capacity_and_hasher(
             capacity,
+            FxBuildHasher::default(),
         ))))
     }
 
