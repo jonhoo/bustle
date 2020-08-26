@@ -21,8 +21,6 @@ tracing-serde = "0.1"
 num_cpus = "1"
 
 # crates.io concurrent hashmap implementations
-
-sharded = { version="0.0.5", features=["hashbrown", "ahash", "parking_lot"] }
 dashmap = "3.11.10"
 flurry = "0.3.0"
 contrie = "0.1.4"
@@ -33,5 +31,4 @@ fxhash = "0.2.1"
 # used in gc_cycle function
 crossbeam-epoch = "0.8"
 crossbeam-epoch-old = { package = "crossbeam-epoch", version = "0.7" }
-
 

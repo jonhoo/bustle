@@ -1,6 +1,6 @@
 mod adapters;
 
-use adapters::{ContrieTable, DashMapTable, FlurryTable, ShardTable};
+use adapters::{ContrieTable, DashMapTable, FlurryTable};
 use bustle::*;
 use std::thread::sleep;
 use std::time::Duration;
@@ -70,7 +70,6 @@ fn main() {
             let _guard = span.enter();
             bench::<_, ContrieTable<u64>>(work, "contrie");
             bench::<_, DashMapTable<u64>>(work, "dashmap");
-            bench::<_, ShardTable<u64>>(work, "sharded");
             bench::<_, FlurryTable>(work, "flurry");
             // seems like these are slow outliers
             // bench::<_, CHashMapTable<u64>>(work);
