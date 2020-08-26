@@ -157,7 +157,9 @@ where
 }
 
 #[derive(Clone)]
-pub struct ContrieTable<K: Eq + std::hash::Hash + 'static>(Arc<ConMap<K, Mutex<u32>>>);
+pub struct ContrieTable<K: Eq + std::hash::Hash + 'static>(
+    Arc<ConMap<K, Mutex<u32>, FxBuildHasher>>,
+);
 
 impl<K> Collection for ContrieTable<K>
 where
@@ -165,7 +167,7 @@ where
 {
     type Handle = Self;
     fn with_capacity(_: usize) -> Self {
-        Self(Arc::new(ConMap::new()))
+        Self(Arc::new(ConMap::with_hasher(FxBuildHasher::default())))
     }
 
     fn pin(&self) -> Self::Handle {
@@ -242,7 +244,7 @@ impl CollectionHandle for FlurryHandle {
 }
 
 #[derive(Clone)]
-pub struct DashMapTable<K>(Arc<DashMap<K, u32>>);
+pub struct DashMapTable<K>(Arc<DashMap<K, u32, FxBuildHasher>>);
 
 impl<K> Collection for DashMapTable<K>
 where
@@ -250,7 +252,10 @@ where
 {
     type Handle = Self;
     fn with_capacity(capacity: usize) -> Self {
-        Self(Arc::new(DashMap::with_capacity(capacity)))
+        Self(Arc::new(DashMap::with_capacity_and_hasher(
+            capacity,
+            FxBuildHasher::default(),
+        )))
     }
 
     fn pin(&self) -> Self::Handle {
