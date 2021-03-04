@@ -24,11 +24,12 @@
     rust_2018_idioms,
     missing_debug_implementations,
     unreachable_pub,
-    intra_doc_link_resolution_failure
+    broken_intra_doc_links
 )]
 
+use std::{sync::Arc, time::Duration};
+
 use rand::prelude::*;
-use std::sync::Arc;
 use tracing::{debug, info, info_span};
 
 /// A workload mix configration.
@@ -169,6 +170,21 @@ pub trait CollectionHandle {
     fn update(&mut self, key: &Self::Key) -> bool;
 }
 
+/// Information about a measurement.
+#[derive(Debug, Clone)]
+pub struct Measurement {
+    /// A seed used for the run.
+    pub seed: [u8; 16],
+    /// A total number of operations.
+    pub total_ops: u64,
+    /// Spent time.
+    pub spent: Duration,
+    /// A number of operations per second.
+    pub throughput: f64,
+    /// An average value of latency.
+    pub latency: Duration,
+}
+
 impl Workload {
     /// Start building a new benchmark workload.
     pub fn new(threads: usize, mix: Mix) -> Self {
@@ -235,8 +251,34 @@ impl Workload {
     /// violated during the benchmark.
     ///
     /// Returns the seed used for the run.
-    #[allow(clippy::cognitive_complexity)]
     pub fn run<T: Collection>(&self) -> [u8; 16]
+    where
+        <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug,
+    {
+        let m = self.run_silently::<T>();
+
+        // TODO: do more with this information
+        // TODO: collect statistics per operation type
+        eprintln!(
+            "{} operations across {} thread(s) in {:?}; time/op = {:?}",
+            m.total_ops,
+            self.threads,
+            m.spent,
+            m.spent / m.total_ops as u32,
+        );
+
+        m.seed
+    }
+
+    /// Execute this workload against the collection type given by `T`.
+    ///
+    /// The key type must be `Send` since we generate the keys on a different thread than the one
+    /// we do the benchmarks on.
+    ///
+    /// The key type must be `Debug` so that we can print meaningful errors if an assertion is
+    /// violated during the benchmark.
+    #[allow(clippy::cognitive_complexity)]
+    pub fn run_silently<T: Collection>(&self) -> Measurement
     where
         <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug,
     {
@@ -340,19 +382,21 @@ impl Workload {
             .into_iter()
             .map(|jh| jh.join().unwrap())
             .collect();
-        let took = start.elapsed();
+        let spent = start.elapsed();
 
-        let avg = took / total_ops as u32;
-        info!(?took, ops = total_ops, ?avg, "workload mix finished");
+        let avg = spent / total_ops as u32;
+        info!(?spent, ops = total_ops, ?avg, "workload mix finished");
 
-        // TODO: do more with this information
-        // TODO: collect statistics per operation type
-        eprintln!(
-            "{} operations across {} thread(s) in {:?}; time/op = {:?}",
-            total_ops, self.threads, took, avg
-        );
+        let total_ops = total_ops as u64;
+        let threads = self.threads as u32;
 
-        seed
+        Measurement {
+            seed,
+            total_ops,
+            spent,
+            throughput: total_ops as f64 / spent.as_secs_f64(),
+            latency: Duration::from_nanos((spent * threads).as_nanos() as u64 / total_ops),
+        }
     }
 }
 
