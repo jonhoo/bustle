@@ -32,6 +32,11 @@ use std::{sync::Arc, time::Duration};
 use rand::prelude::*;
 use tracing::{debug, info, info_span};
 
+#[cfg(all(not(target_os = "emscripten"), target_pointer_width = "64"))]
+type SmallRng = rand_pcg::Pcg64Mcg;
+#[cfg(not(all(not(target_os = "emscripten"), target_pointer_width = "64")))]
+type SmallRng = rand_pcg::Pcg32;
+
 /// A workload mix configration.
 ///
 /// The sum of the fields must add to 100.
@@ -292,7 +297,7 @@ impl Workload {
         let total_ops = (initial_capacity as f64 * self.ops_f) as usize;
 
         let seed = self.seed.unwrap_or_else(rand::random);
-        let mut rng: rand::rngs::SmallRng = rand::SeedableRng::from_seed(seed);
+        let mut rng: SmallRng = SeedableRng::from_seed(seed);
 
         // NOTE: it'd be nice to include std::intrinsics::type_name::<T> here
         let span = info_span!("benchmark", mix = ?self.mix, threads = self.threads);
@@ -325,7 +330,7 @@ impl Workload {
             let mut thread_seed = [0u8; 16];
             rng.fill_bytes(&mut thread_seed[..]);
             generators.push(std::thread::spawn(move || {
-                let mut rng: rand::rngs::SmallRng = rand::SeedableRng::from_seed(thread_seed);
+                let mut rng: SmallRng = SeedableRng::from_seed(thread_seed);
                 let mut keys: Vec<<T::Handle as CollectionHandle>::Key> =
                     Vec::with_capacity(insert_keys_per_thread);
                 keys.extend((0..insert_keys_per_thread).map(|_| rng.next_u64().into()));

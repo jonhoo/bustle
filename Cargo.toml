@@ -17,8 +17,9 @@ azure-devops = { project = "jonhoo/jonhoo", pipeline = "bustle", build = "18" }
 maintenance = { status = "experimental" }
 
 [dependencies]
-rand = { version = "0.7", features = ["small_rng"] }
+rand = { version = "0.8" }
 tracing = { version = "0.1", features = ["std"], default-features = false }
+rand_pcg = "0.3"
 
 [dev-dependencies]
 tracing-subscriber = "0.2"
