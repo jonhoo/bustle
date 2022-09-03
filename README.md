@@ -1,6 +1,5 @@
 [![Crates.io](https://img.shields.io/crates/v/bustle.svg)](https://crates.io/crates/bustle)
 [![Documentation](https://docs.rs/bustle/badge.svg)](https://docs.rs/bustle/)
-[![Build Status](https://dev.azure.com/jonhoo/jonhoo/_apis/build/status/bustle?branchName=master)](https://dev.azure.com/jonhoo/jonhoo/_build/latest?definitionId=18&branchName=master)
 
 Bustle is a benchmarking harness for concurrent key-value collections.
 
