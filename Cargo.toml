@@ -21,7 +21,7 @@ rand = { version = "0.7", features = ["small_rng"] }
 tracing = { version = "0.1", features = ["std"], default-features = false }
 
 [dev-dependencies]
-tracing-subscriber = "0.2"
+tracing-subscriber = "0.2.16"
 num_cpus = "1"
 
 [[bench]]
