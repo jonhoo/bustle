@@ -27,7 +27,7 @@
     broken_intra_doc_links
 )]
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, sync::Barrier, time::Duration};
 
 use rand::prelude::*;
 use tracing::{debug, info, info_span};
@@ -362,11 +362,12 @@ impl Workload {
         info!("start workload mix");
         let ops_per_thread = total_ops / self.threads;
         let op_mix = Arc::new(op_mix.into_boxed_slice());
-        let start = std::time::Instant::now();
+        let barrier = Arc::new(Barrier::new(self.threads + 1));
         let mut mix_threads = Vec::with_capacity(self.threads);
         for keys in keys {
             let table = Arc::clone(&table);
             let op_mix = Arc::clone(&op_mix);
+            let barrier = Arc::clone(&barrier);
             mix_threads.push(std::thread::spawn(move || {
                 let mut table = table.pin();
                 mix(
@@ -375,14 +376,20 @@ impl Workload {
                     &op_mix,
                     ops_per_thread,
                     prefill_per_thread,
+                    barrier,
                 )
             }));
         }
+
+        barrier.wait();
+        let start = std::time::Instant::now();
+        barrier.wait();
+        let spent = start.elapsed();
+
         let _samples: Vec<_> = mix_threads
             .into_iter()
             .map(|jh| jh.join().unwrap())
             .collect();
-        let spent = start.elapsed();
 
         let avg = spent / total_ops as u32;
         info!(?spent, ops = total_ops, ?avg, "workload mix finished");
@@ -415,6 +422,7 @@ fn mix<H: CollectionHandle>(
     op_mix: &[Operation],
     ops: usize,
     prefilled: usize,
+    barrier: Arc<Barrier>,
 ) where
     H::Key: std::fmt::Debug,
 {
@@ -434,6 +442,7 @@ fn mix<H: CollectionHandle>(
     let c = nkeys / 4 - 1;
     let find_seq_mask = nkeys - 1;
 
+    barrier.wait();
     for (i, op) in (0..(ops / op_mix.len()))
         .flat_map(|_| op_mix.iter())
         .enumerate()
@@ -514,4 +523,5 @@ fn mix<H: CollectionHandle>(
             }
         }
     }
+    barrier.wait();
 }
