@@ -442,7 +442,12 @@ fn mix<H: CollectionHandle>(
     let c = nkeys / 4 - 1;
     let find_seq_mask = nkeys - 1;
 
-    barrier.wait();
+    // The elapsed time is measured by the lifetime of `workload_scope`.
+    let workload_scope = scopeguard::guard(barrier, |barrier| {
+        barrier.wait();
+    });
+    workload_scope.wait();
+
     for (i, op) in (0..(ops / op_mix.len()))
         .flat_map(|_| op_mix.iter())
         .enumerate()
@@ -523,5 +528,4 @@ fn mix<H: CollectionHandle>(
             }
         }
     }
-    barrier.wait();
 }
