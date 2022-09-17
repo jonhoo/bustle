@@ -14,7 +14,7 @@ categories = ["concurrency", "development-tools::profiling", "development-tools:
 
 [dependencies]
 rand = { version = "0.7", features = ["small_rng"] }
-scopeguard = "0.1"
+scopeguard = "1"
 tracing = { version = "0.1", features = ["std"], default-features = false }
 
 [dev-dependencies]
