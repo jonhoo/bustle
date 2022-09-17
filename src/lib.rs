@@ -118,7 +118,7 @@ pub struct Workload {
     ///
     /// If `None`, the seed is picked randomly.
     /// If `Some`, the workload is deterministic if `threads == 1`.
-    seed: Option<[u8; 16]>,
+    seed: Option<[u8; 32]>,
 }
 
 /// A collection that can be benchmarked by bustle.
@@ -174,7 +174,7 @@ pub trait CollectionHandle {
 #[derive(Debug, Clone)]
 pub struct Measurement {
     /// A seed used for the run.
-    pub seed: [u8; 16],
+    pub seed: [u8; 32],
     /// A total number of operations.
     pub total_ops: u64,
     /// Spent time.
@@ -237,7 +237,7 @@ impl Workload {
     ///
     /// The seed does _not_ dictate thread interleaving, so you will only observe the exact same
     /// workload if you run the benchmark with `nthreads == 1`.
-    pub fn seed(&mut self, seed: [u8; 16]) -> &mut Self {
+    pub fn seed(&mut self, seed: [u8; 32]) -> &mut Self {
         self.seed = Some(seed);
         self
     }
@@ -251,7 +251,7 @@ impl Workload {
     /// violated during the benchmark.
     ///
     /// Returns the seed used for the run.
-    pub fn run<T: Collection>(&self) -> [u8; 16]
+    pub fn run<T: Collection>(&self) -> [u8; 32]
     where
         <T::Handle as CollectionHandle>::Key: Send + std::fmt::Debug,
     {
@@ -322,7 +322,7 @@ impl Workload {
             ((insert_keys + self.threads - 1) / self.threads).next_power_of_two();
         let mut generators = Vec::new();
         for _ in 0..self.threads {
-            let mut thread_seed = [0u8; 16];
+            let mut thread_seed = [0u8; 32];
             rng.fill_bytes(&mut thread_seed[..]);
             generators.push(std::thread::spawn(move || {
                 let mut rng: rand::rngs::SmallRng = rand::SeedableRng::from_seed(thread_seed);
