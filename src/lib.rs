@@ -24,7 +24,7 @@
     rust_2018_idioms,
     missing_debug_implementations,
     unreachable_pub,
-    broken_intra_doc_links
+    rustdoc::broken_intra_doc_links
 )]
 
 use std::{sync::Arc, sync::Barrier, time::Duration};
