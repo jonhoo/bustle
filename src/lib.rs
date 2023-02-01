@@ -448,7 +448,7 @@ fn mix<H: CollectionHandle>(
     });
     workload_scope.wait();
 
-    for (i, op) in (0..((ops + op_mix.len() -1) / op_mix.len()))
+    for (i, op) in (0..((ops + op_mix.len() - 1) / op_mix.len()))
         .flat_map(|_| op_mix.iter())
         .enumerate()
     {
