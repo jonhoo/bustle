@@ -21,10 +21,3 @@ tracing = { version = "0.1", features = ["std"], default-features = false }
 tracing-subscriber = "0.3.8"
 num_cpus = "1"
 
-[[bench]]
-name = "arc_mutex_std"
-harness = false
-
-[[bench]]
-name = "arc_rwlock_std"
-harness = false
